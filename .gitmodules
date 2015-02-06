@@ -1,0 +1,3 @@
+[submodule "baslib"]
+	path = baslib
+	url = ./lib/baslib
