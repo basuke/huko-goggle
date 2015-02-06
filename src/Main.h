@@ -3,7 +3,12 @@
 
 #include <SimpleTimer.h>
 
-void begin(SimpleTimer &timer);
-void tick(unsigned int current);
+class Main {
+public:
+	static void setup(SimpleTimer &timer);
+	static void millisec(unsigned int current);
+	static void tick(unsigned int current);
+	static void sec(unsigned int current);
+};
 
 #endif

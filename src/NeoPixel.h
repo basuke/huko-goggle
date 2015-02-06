@@ -83,8 +83,11 @@ public:
 	inline bool hasAttached() const { return (_target != NULL); }
 
 	virtual bool didAttach();
+	virtual void didDetach();
 	virtual void beforeTick(unsigned int tick);
 	virtual void afterTick(unsigned int tick);
+	virtual bool beforeSetPixel(int index, byte color[3]);
+	virtual void afterSetPixel(int index, byte color[3]);
 
 	inline NeoPixelAddon* next() const { return _next; }
 	void setNext(NeoPixelAddon *next);
@@ -99,7 +102,19 @@ protected:
 
 class NeoPixelDimmerAddon : public NeoPixelAddon {
 public:
+	NeoPixelDimmerAddon(byte *buffer = NULL, size_t size = 0);
+	virtual ~NeoPixelDimmerAddon();
+
+	virtual bool didAttach();
+	virtual void didDetach();
 	virtual void afterTick(unsigned int tick);
+	virtual bool beforeSetPixel(int index, byte color[3]);
+	virtual void afterSetPixel(int index, byte color[3]);
+
+protected:
+	byte *_buffer;
+	size_t _size;
+	bool _allocated;
 };
 
 #endif
