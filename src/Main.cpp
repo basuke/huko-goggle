@@ -3,40 +3,98 @@
 #include "NeoPixel.h"
 #include "Audio.h"
 #include <Wire.h>
+#include <SFE_MicroOLED.h>
+
+//////////////////////////
+// MicroOLED Definition //
+//////////////////////////
+#define PIN_RESET 9  // Connect RST to pin 9
+#define PIN_DC    8  // Connect DC to pin 8
+#define PIN_CS_1  10 // Connect first CS to pin 10
+#define PIN_CS_2  7  // Connect second CS to pin 7
+
+//////////////////////////////////
+// MicroOLED Object Declaration //
+//////////////////////////////////
+// Declare a MicroOLED object. The parameters include:
+// 1 - Reset pin: Any digital pin
+// 2 - D/C pin: Any digital pin (SPI mode only)
+// 3 - CS pin: Any digital pin (SPI mode only, 10 recommended)
+MicroOLED oled1(PIN_RESET, PIN_DC, PIN_CS_1);
+MicroOLED oled2(PIN_RESET, PIN_DC, PIN_CS_2);
 
 static NeoPixelCoordinator neoPixel(5);
 static NeoPixelRing leftRing(0, 16);
 static NeoPixelRing rightRing(16, 16);
+static NeoPixelDimmerAddon dimmer;
+
+void crazyRing();
 
 void sensor();
 void audioLevel(double value);
+extern void test();
 
 Audio audio(A1, audioLevel, 40 /*Hz*/, 16.0);
 
 void Main::setup(SimpleTimer &timer)
 {
+	// Congigure pins to control OLEDs
+	oled1.setup();
+	oled2.setup();
+
+	// Send initialize commands to each OLEDs
+	oled1.initialize();
+	oled2.initialize();
+
+	oled1.setFontType(1);
+	oled2.setFontType(1);
+
+	oled1.display();
+	oled2.display();
+
 	NeoPixelCollection *collections[] = {
-		&leftRing,
 		&rightRing,
+		&leftRing,
 	};
 	neoPixel.begin(collections , 2);
 
-	// leftRing.attach(new NeoPixelDimmerAddon());
-
-	byte blue[3] = {0, 0, 255};
-	leftRing.setColor(blue);
+	rightRing.attach(&dimmer);
 
 	// Wire.begin();
 	Serial.begin(9600);
 	delay(500);
 	Serial.println("Go! >>>");
+
+	timer.setInterval(1000 / 12, crazyRing);
 }
 
 int ringPos = 0;
 
 void Main::millisec(unsigned int current)
 {
-	audio.sample();
+	// audio.sample();
+}
+
+void crazyRing()
+{
+	byte blue[3] = {0, 0, 255};
+	byte red[3] = {255, 0, 0};
+	byte black[3] = {0, 0, 0};
+
+	leftRing.setColor(ringPos, blue);
+	leftRing.setColor(ringPos - 1, black);
+
+	byte color[3];
+	color[0] = random(0, 256);
+	color[1] = random(0, 256);
+	color[2] = random(0, 256);
+	rightRing.setColor(ringPos, color);
+
+	ringPos += 1;
+	if (ringPos >= 16) ringPos = 0;
+
+	leftRing.setColor(0, red);
+	rightRing.setColor(0, red);
 }
 
 void Main::tick(unsigned int current)
@@ -46,6 +104,22 @@ void Main::tick(unsigned int current)
 
 void Main::sec(unsigned int current)
 {
+	oled1.clear(PAGE);
+	oled2.clear(PAGE);
+
+	oled1.setCursor(0, 0);
+	oled2.setCursor(0, 0);
+
+	if ((current % 2) == 0) {
+		oled1.print("Hello");
+		oled2.print("world!");
+	} else {
+		oled1.print("See you");
+		oled2.print("again.");
+	}
+
+	oled1.display();
+	oled2.display();
 }
 
 void sensor()

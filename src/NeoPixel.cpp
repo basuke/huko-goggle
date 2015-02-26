@@ -61,7 +61,22 @@ void NeoPixelCollection::attach(NeoPixelAddon *addon)
 
 void NeoPixelCollection::detach(NeoPixelAddon *addon)
 {
+	if (addon->hasAttached()) {
+		addon->setTarget(NULL);
+		addon->didDetach();
 
+		if (_addon != addon) {
+			NeoPixelAddon *last = _addon;
+
+			while (last->next()) {
+				if (last)
+				last = last->next();
+			}
+			last->setNext(addon);
+		} else {
+			_addon = addon->next();
+		}
+	}
 }
 
 void NeoPixelCollection::beforeTick(unsigned int tick)
@@ -165,12 +180,27 @@ bool NeoPixelAddon::didAttach()
 	return true;
 }
 
+void NeoPixelAddon::didDetach()
+{
+
+}
+
 void NeoPixelAddon::beforeTick(unsigned int tick)
 {
 }
 
 void NeoPixelAddon::afterTick(unsigned int tick)
 {
+}
+
+bool NeoPixelAddon::beforeSetPixel(int index, byte color[3])
+{
+
+}
+
+void NeoPixelAddon::afterSetPixel(int index, byte color[3])
+{
+
 }
 
 void NeoPixelAddon::setNext(NeoPixelAddon *next)
@@ -185,6 +215,15 @@ void NeoPixelAddon::setTarget(NeoPixelCollection *collection)
 
 // =====================
 // Dimmer addon
+
+NeoPixelDimmerAddon::NeoPixelDimmerAddon()
+{
+
+}
+NeoPixelDimmerAddon::~NeoPixelDimmerAddon()
+{
+
+}
 
 void NeoPixelDimmerAddon::afterTick(unsigned int tick)
 {

@@ -102,14 +102,10 @@ protected:
 
 class NeoPixelDimmerAddon : public NeoPixelAddon {
 public:
-	NeoPixelDimmerAddon(byte *buffer = NULL, size_t size = 0);
+	NeoPixelDimmerAddon();
 	virtual ~NeoPixelDimmerAddon();
 
-	virtual bool didAttach();
-	virtual void didDetach();
 	virtual void afterTick(unsigned int tick);
-	virtual bool beforeSetPixel(int index, byte color[3]);
-	virtual void afterSetPixel(int index, byte color[3]);
 
 protected:
 	byte *_buffer;
