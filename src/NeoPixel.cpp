@@ -1,5 +1,5 @@
 #include "NeoPixel.h"
-
+#include "Timer.h"
 #include <Adafruit_NeoPixel.h>
 
 // =====================
@@ -11,20 +11,25 @@ NeoPixelCollection::NeoPixelCollection(int start, int size)
 {
 }
 
+int NeoPixelCollection::indexToPosition(int index)
+{
+	return _start + index;
+}
+
 void NeoPixelCollection::getColor(int index, byte color[3])
 {
-	_coordinator->getPixel(_start + index, color);
+	_coordinator->getPixel(indexToPosition(index), color);
 }
 
 void NeoPixelCollection::setColor(int index, byte color[3])
 {
-	_coordinator->setPixel(_start + index, color);
+	_coordinator->setPixel(indexToPosition(index), color);
 }
 
 void NeoPixelCollection::setColor(byte color[3])
 {
 	for (int i = 0; i < _size; i++) {
-		_coordinator->setPixel(_start + i, color);
+		_coordinator->setPixel(indexToPosition(i), color);
 	}
 }
 
@@ -100,13 +105,25 @@ void NeoPixelCollection::afterTick(unsigned int tick)
 // NeoPixel Ring
 
 NeoPixelRing::NeoPixelRing(int start, int size)
-	: NeoPixelCollection(start, size)
+	: NeoPixelCollection(start, size), _clockwise(true)
 {
+
+}
+
+
+int NeoPixelRing::indexToPosition(int index)
+{
+	int size = getSize();
+	if (index < 0 || index >= size) index = index % size;
+	if (index != 0 && _clockwise) index = size - index;
+	return NeoPixelCollection::indexToPosition(index);
 
 }
 
 // ==========================
 // Whole NeoPixel Coordinator
+
+static void callTick(void *refcon);
 
 NeoPixelCoordinator::NeoPixelCoordinator(int pin)
 	: _pin(pin), _changed(false), _first(NULL), _neoPixel(NULL)
@@ -131,6 +148,17 @@ void NeoPixelCoordinator::begin(NeoPixelCollection *collections[], int count)
 
 	_neoPixel = new Adafruit_NeoPixel(size, _pin, NEO_GRB + NEO_KHZ800);
 	_neoPixel->begin();
+
+	Timer::repeat(1000 / 60, callTick, (void *) this);
+}
+
+static void callTick(void *refcon)
+{
+	NeoPixelCoordinator *pixel = (NeoPixelCoordinator *)refcon;
+	static unsigned int tick = 0;
+
+	pixel->tick(tick);
+	tick += 1;
 }
 
 void NeoPixelCoordinator::tick(unsigned int tick)
@@ -216,13 +244,33 @@ void NeoPixelAddon::setTarget(NeoPixelCollection *collection)
 // =====================
 // Dimmer addon
 
-NeoPixelDimmerAddon::NeoPixelDimmerAddon()
-{
+typedef struct NeoPixelDimmerRecord {
+	byte phase;
+	byte target[3];
+} NeoPixelDimmerRecord;
 
+NeoPixelDimmerAddon::NeoPixelDimmerAddon()
+	: _buffer(NULL)
+{
 }
+
 NeoPixelDimmerAddon::~NeoPixelDimmerAddon()
 {
+	if (_buffer) free(_buffer);
+}
 
+bool NeoPixelDimmerAddon::didAttach()
+{
+	int size = target()->getSize();
+	_buffer = (byte *) malloc(size * sizeof(NeoPixelDimmerRecord));
+	memset(_buffer, 0, size * sizeof(NeoPixelDimmerRecord));
+	return true;
+}
+
+void NeoPixelDimmerAddon::didDetach()
+{
+	if (_buffer) free(_buffer);
+	_buffer = NULL;
 }
 
 void NeoPixelDimmerAddon::afterTick(unsigned int tick)

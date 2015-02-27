@@ -1,7 +1,7 @@
 #ifndef _NEOPIXEL_H_
 #define _NEOPIXEL_H_
 
-#include <SimpleTimer.h>
+#include <Arduino.h>
 
 class NeoPixelCoordinator;
 class NeoPixelCollection;
@@ -40,6 +40,8 @@ protected:
 	NeoPixelAddon *_addon;
 	int _start;
 	int _size;
+
+	virtual int indexToPosition(int index);
 };
 
 // =====================
@@ -49,7 +51,12 @@ class NeoPixelRing : public NeoPixelCollection {
 public:
 	NeoPixelRing(int start, int size);
 
-	void setCounterClockWise(bool flag);
+	virtual int indexToPosition(int index);
+
+	void setClockwise(bool flag) { _clockwise = flag; }
+
+private:
+	bool _clockwise;
 };
 
 // =====================
@@ -105,12 +112,12 @@ public:
 	NeoPixelDimmerAddon();
 	virtual ~NeoPixelDimmerAddon();
 
+	virtual bool didAttach();
+	virtual void didDetach();
 	virtual void afterTick(unsigned int tick);
 
 protected:
 	byte *_buffer;
-	size_t _size;
-	bool _allocated;
 };
 
 #endif
