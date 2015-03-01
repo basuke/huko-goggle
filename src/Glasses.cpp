@@ -15,17 +15,20 @@ public:
 	Ring16(int offset);
 	void off(Fade fade = EaseIn, int duration = 500);
 
-	void setColor(int index, byte color[3], Fade fade = EaseIn, int duration = 500);
-	void setColor(byte color[3], Fade fade = EaseIn, int duration = 500);
+	void setColor(int index, Color color, Fade fade = EaseIn, int duration = 500, Fade offFade = NoFade, double peakFraction = 0.5);
+	void setColor(Color color, Fade fade = EaseIn, int duration = 500, Fade offFade = NoFade, double peakFraction = 0.5);
 
 	virtual void beforeTick();
 
 private:
 	byte fades[16];
-	byte startColors[16][3];
-	byte endColors[16][3];
+	Color startColors[16];
+	Color endColors[16];
 	unsigned long startTimes[16];
-	unsigned long endTimes[16];
+	int durations[16];
+	byte nextFades[16];
+	int nextDurations[16];
+
 	bool fading;
 
 	void updateFadingState();
@@ -38,7 +41,7 @@ Ring16::Ring16(int offset)
 
 void Ring16::off(Fade fade, int duration)
 {
-	byte off[] = {0, 0, 0};
+	Color off = Color(0, 0, 0);
 	setColor(off, fade, duration);
 }
 
@@ -53,21 +56,24 @@ void Ring16::updateFadingState()
 	}
 }
 
-void Ring16::setColor(int index, byte color[3], Fade fade, int duration)
+void Ring16::setColor(int index, Color color, Fade fade, int duration, Fade offFade, double peakFraction)
 {
 	index = index % 16;
 	if (duration <= 0) fade = NoFade;
 
 	fades[index] = fade;
 
-	if (fade) {
+	if (fade || offFade) {
 		unsigned long now = Timer::now();
 
 		startTimes[index] = now;
-		endTimes[index] = now + duration;
+		durations[index] = duration * peakFraction;;
 
 		getColor(index, startColors[index]);
-		memcpy(endColors[index], color, 3);
+		endColors[index] = color;
+
+		startTimes[index] = now;
+		durations[index] = duration * peakFraction;;
 
 		fading = true;
 	} else {
@@ -76,10 +82,10 @@ void Ring16::setColor(int index, byte color[3], Fade fade, int duration)
 	}
 }
 
-void Ring16::setColor(byte color[3], Fade fade, int duration)
+void Ring16::setColor(Color color, Fade fade, int duration, Fade offFade, double peakFraction)
 {
 	for (int i = 0; i < 16; i++) {
-		setColor(i, color, fade);
+		setColor(i, color, fade, duration);
 	}
 }
 
@@ -102,18 +108,10 @@ static double easeInOut(double fraction)
 	return (fraction * (fraction - 2.0) - 1.0) / -2.0;
 }
 
-static void calcColor(byte start[3], byte end[3], double fraction, byte color[3])
+static void calcColor(Color start, Color end, double fraction, Color color)
 {
-	for (int i = 0; i < 3; i++) {
-		double diff = (double) end[i] - (double) start[i];
-		double val = start[i];
-
-		val += diff * fraction;
-		if (val < 0) val = 0;
-		else if (val > 255) val = 255;
-
-		color[i] = val;
-	}
+	color = start;
+	color.merge(end, fraction);
 }
 
 static char buf[100];
@@ -128,7 +126,7 @@ void Ring16::beforeTick()
 
 		for (int i = 0; i < 16; i++) {
 			if (fades[i]) {
-				unsigned long s = startTimes[i], e = endTimes[i];
+				unsigned long s = startTimes[i], e = s + durations[i];
 
 				if (now > e) now = e;
 				double fraction = ((double) (now - s)) / ((double) (e - s));
@@ -155,8 +153,8 @@ void Ring16::beforeTick()
 
 				// DEBUG(scale);
 
-				byte color[3];
-				calcColor(startColors[i], endColors[i], scale, color);
+				Color color = startColors[i];
+				color.merge(endColors[i], scale);
 
 				NeoPixelCollection::setColor(i, color);
 
@@ -178,7 +176,7 @@ static Ring16 leftRing(16);
 static NeoPixelDimmerAddon dimmer;
 
 static int circlingStep;
-static byte circlingColor[3];
+static Color circlingColor;
 
 void Glasses::begin()
 {
@@ -195,7 +193,7 @@ void Glasses::begin()
 }
 
 
-void Glasses::flash(byte color[3])
+void Glasses::flash(Color color)
 {
 	rightRing.setColor(color, Liner);
 	leftRing.setColor(color, Liner);
@@ -209,12 +207,12 @@ static void circling()
 	circlingStep += 1;
 }
 
-void Glasses::circle(byte color[3], int duration)
+void Glasses::circle(Color color, int duration)
 {
 	circlingStep = 0;
-	memcpy(circlingColor, color, 3);
+	circlingColor = color;
 
-	sprintf(buf, "[%08lx]: color: %3d %3d %3d", Timer::now(), color[0], color[1], color[2]);
+	sprintf(buf, "[%08lx]: color: %3d %3d %3d", Timer::now(), color.red, color.green, color.blue);
 	DEBUG(buf);
 	Serial.flush();
 

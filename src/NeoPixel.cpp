@@ -2,6 +2,63 @@
 #include "Timer.h"
 #include <Adafruit_NeoPixel.h>
 
+// ====================================
+
+Color::Color()
+	: red(0), green(0), blue(0)
+{
+}
+
+Color::Color(byte gray)
+	: red(gray), green(gray), blue(gray)
+{
+}
+
+Color::Color(byte red, byte green, byte blue)
+	: red(red), green(green), blue(blue)
+{
+}
+
+Color::Color(const Color &other)
+	: red(other.red), green(other.green), blue(other.blue)
+{
+}
+
+bool Color::isBlack() const
+{
+	return red == 0 && green == 0 && blue == 0;
+}
+
+void Color::merge(Color color, double ratio)
+{
+	double ratio0 = 1.0 - ratio;
+
+	red = (double) red * ratio0 + (double) color.red * ratio;
+	green = (double) green * ratio0 + (double) color.green * ratio;
+	blue = (double) blue * ratio0 + (double) color.blue * ratio;
+}
+
+static inline bool scaleColorComponent(byte &c, double scale)
+{
+	double val = scale * c;
+	if (val > 255) {
+		c = 255;
+		return true;
+	} else {
+		c = val;
+		return false;
+	}
+}
+
+bool Color::scale(double scale)
+{
+	bool saturated = false;
+	saturated = scaleColorComponent(red, scale);
+	saturated |= scaleColorComponent(green, scale);
+	saturated |= scaleColorComponent(blue, scale);
+	return saturated;
+}
+
 // =====================
 // abstract collection
 
@@ -16,17 +73,17 @@ int NeoPixelCollection::indexToPosition(int index)
 	return _start + index;
 }
 
-void NeoPixelCollection::getColor(int index, byte color[3])
+void NeoPixelCollection::getColor(int index, Color &color)
 {
 	_coordinator->getPixel(indexToPosition(index), color);
 }
 
-void NeoPixelCollection::setColor(int index, byte color[3])
+void NeoPixelCollection::setColor(int index, Color color)
 {
 	_coordinator->setPixel(indexToPosition(index), color);
 }
 
-void NeoPixelCollection::setColor(byte color[3])
+void NeoPixelCollection::setColor(Color color)
 {
 	for (int i = 0; i < _size; i++) {
 		_coordinator->setPixel(indexToPosition(i), color);
@@ -181,15 +238,15 @@ void NeoPixelCoordinator::tick()
 	}
 }
 
-void NeoPixelCoordinator::getPixel(int index, byte color[3]) {
+void NeoPixelCoordinator::getPixel(int index, Color &color) {
 	uint32_t argb = _neoPixel->getPixelColor(index);
-	color[0] = (argb >> 16) & 0xffu;
-	color[1] = (argb >> 8) & 0xffu;
-	color[2] = (argb >> 0) & 0xffu;
+	color.red = (argb >> 16) & 0xffu;
+	color.green = (argb >> 8) & 0xffu;
+	color.blue = (argb >> 0) & 0xffu;
 }
 
-void NeoPixelCoordinator::setPixel(int index, byte color[3]) {
-	_neoPixel->setPixelColor(index, Adafruit_NeoPixel::Color(color[0], color[1], color[2]));
+void NeoPixelCoordinator::setPixel(int index, Color color) {
+	_neoPixel->setPixelColor(index, color.red, color.green, color.blue);
 	_changed = true;
 }
 
@@ -219,12 +276,12 @@ void NeoPixelAddon::afterTick()
 {
 }
 
-bool NeoPixelAddon::beforeSetPixel(int index, byte color[3])
+bool NeoPixelAddon::beforeSetPixel(int index, Color color)
 {
 
 }
 
-void NeoPixelAddon::afterSetPixel(int index, byte color[3])
+void NeoPixelAddon::afterSetPixel(int index, Color color)
 {
 
 }
@@ -244,7 +301,7 @@ void NeoPixelAddon::setTarget(NeoPixelCollection *collection)
 
 typedef struct NeoPixelDimmerRecord {
 	byte phase;
-	byte target[3];
+	Color target;
 } NeoPixelDimmerRecord;
 
 NeoPixelDimmerAddon::NeoPixelDimmerAddon()
@@ -279,16 +336,10 @@ void NeoPixelDimmerAddon::afterTick()
 	for (int i = 0; i < size; i++) {
 		bool changed = false;
 
-		byte color[3];
+		Color color;
 		t->getColor(i, color);
-		for (int c = 0; c < 3; c++) {
-			int val = color[c];
-			if (val > 0) {
-				color[c] = val * 94 / 100;
-				changed = true;
-			}
-		}
-		if (changed) {
+		if (!color.isBlack()) {
+			color.scale(0.94);
 			t->setColor(i, color);
 		}
 	}

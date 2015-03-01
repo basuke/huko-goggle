@@ -8,6 +8,23 @@ class NeoPixelCollection;
 class NeoPixelAddon;
 class Adafruit_NeoPixel;
 
+class Color {
+public:
+	Color();
+	Color(byte gray);
+	Color(byte red, byte green, byte blue);
+	Color(const Color &other);
+
+	bool isBlack() const;
+
+	void merge(Color other, double ratio=0.5);
+	bool scale(double scale);
+
+	byte red;
+	byte green;
+	byte blue;
+};
+
 // =====================
 // abstract collection
 
@@ -15,11 +32,11 @@ class NeoPixelCollection {
 public:
 	NeoPixelCollection(int start, int size);
 
-	void getColor(int index, byte color[3]);
-	virtual void setColor(int index, byte color[3]);
+	void getColor(int index, Color &color);
+	virtual void setColor(int index, Color color);
 
 	// set all pixels to that color
-	virtual void setColor(byte color[3]);
+	virtual void setColor(Color color);
 
 	void setCordinator(NeoPixelCoordinator *coordinator);
 
@@ -70,8 +87,8 @@ public:
 	inline bool hasBegan() const { return (_neoPixel != NULL); }
 
 	void tick();
-	void getPixel(int index, byte color[3]);
-	void setPixel(int index, byte color[3]);
+	void getPixel(int index, Color &color);
+	void setPixel(int index, Color color);
 
 	byte *pixels() const;
 	int numberOfPixels() const;
@@ -93,8 +110,8 @@ public:
 	virtual void didDetach();
 	virtual void beforeTick();
 	virtual void afterTick();
-	virtual bool beforeSetPixel(int index, byte color[3]);
-	virtual void afterSetPixel(int index, byte color[3]);
+	virtual bool beforeSetPixel(int index, Color color);
+	virtual void afterSetPixel(int index, Color color);
 
 	inline NeoPixelAddon* next() const { return _next; }
 	void setNext(NeoPixelAddon *next);

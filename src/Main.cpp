@@ -32,9 +32,9 @@ void readCommand()
 {
 	readAccelerometer();
 
-	byte red[3] = {255, 0, 0};
-	byte green[3] = {0, 255, 0};
-	byte blue[3] = {0, 0, 255};
+	Color red(255, 0, 0);
+	Color green(0, 255, 0);
+	Color blue(0, 0, 255);
 
 	int c = Serial.read();
 	switch (c) {
@@ -54,15 +54,15 @@ void readCommand()
 void ping()
 {
 	static int n = 1;
-	byte color[8][3] = {
-		{0, 0, 0},
-		{0, 0, 255},
-		{255, 0, 0},
-		{255, 0, 255},
-		{0, 255, 0},
-		{0, 255, 255},
-		{255, 255, 0},
-		{255, 255, 255},
+	Color color[8] = {
+		Color(0, 0, 0),
+		Color(0, 0, 255),
+		Color(255, 0, 0),
+		Color(255, 0, 255),
+		Color(0, 255, 0),
+		Color(0, 255, 255),
+		Color(255, 255, 0),
+		Color(255, 255, 255),
 	};
 	Glasses::circle(color[n]);
 	n = (n + 1) % 8;
