@@ -84,19 +84,19 @@ void NeoPixelCollection::detach(NeoPixelAddon *addon)
 	}
 }
 
-void NeoPixelCollection::beforeTick(unsigned int tick)
+void NeoPixelCollection::beforeTick()
 {
 	NeoPixelAddon *addon = _addon;
 	while (addon) {
-		addon->beforeTick(tick);
+		addon->beforeTick();
 		addon = addon->next();
 	}
 }
-void NeoPixelCollection::afterTick(unsigned int tick)
+void NeoPixelCollection::afterTick()
 {
 	NeoPixelAddon *addon = _addon;
 	while (addon) {
-		addon->afterTick(tick);
+		addon->afterTick();
 		addon = addon->next();
 	}
 }
@@ -149,25 +149,23 @@ void NeoPixelCoordinator::begin(NeoPixelCollection *collections[], int count)
 	_neoPixel = new Adafruit_NeoPixel(size, _pin, NEO_GRB + NEO_KHZ800);
 	_neoPixel->begin();
 
-	Timer::repeat(1000 / 60, callTick, (void *) this);
+	Timer::repeat(Hz(60), callTick, (void *) this);
 }
 
 static void callTick(void *refcon)
 {
 	NeoPixelCoordinator *pixel = (NeoPixelCoordinator *)refcon;
-	static unsigned int tick = 0;
 
-	pixel->tick(tick);
-	tick += 1;
+	pixel->tick();
 }
 
-void NeoPixelCoordinator::tick(unsigned int tick)
+void NeoPixelCoordinator::tick()
 {
 	NeoPixelCollection *target;
 
 	target = _first;
 	while (target) {
-		target->beforeTick(tick);
+		target->beforeTick();
 		target = target->next();
 	}
 
@@ -178,7 +176,7 @@ void NeoPixelCoordinator::tick(unsigned int tick)
 
 	target = _first;
 	while (target) {
-		target->afterTick(tick);
+		target->afterTick();
 		target = target->next();
 	}
 }
@@ -213,11 +211,11 @@ void NeoPixelAddon::didDetach()
 
 }
 
-void NeoPixelAddon::beforeTick(unsigned int tick)
+void NeoPixelAddon::beforeTick()
 {
 }
 
-void NeoPixelAddon::afterTick(unsigned int tick)
+void NeoPixelAddon::afterTick()
 {
 }
 
@@ -273,7 +271,7 @@ void NeoPixelDimmerAddon::didDetach()
 	_buffer = NULL;
 }
 
-void NeoPixelDimmerAddon::afterTick(unsigned int tick)
+void NeoPixelDimmerAddon::afterTick()
 {
 	NeoPixelCollection *t = target();
 	int size = t->getSize();

@@ -8,6 +8,7 @@ void sensor();
 extern void test();
 
 void ping();
+void pingOff();
 
 void Main::setup()
 {
@@ -18,7 +19,7 @@ void Main::setup()
 	pinMode(A2, INPUT);
 	pinMode(A6, INPUT);
 
-	Timer::repeat(1000, ping);
+	Timer::repeat(2000, ping);
 	Timer::repeat(Hz(15), readCommand);
 
 	// Wire.begin();
@@ -52,8 +53,19 @@ void readCommand()
 
 void ping()
 {
-	byte color[3] = {random(0, 255), random(0, 255), random(0, 255)};
-	Glasses::circle(color);
+	static int n = 1;
+	byte color[8][3] = {
+		{0, 0, 0},
+		{0, 0, 255},
+		{255, 0, 0},
+		{255, 0, 255},
+		{0, 255, 0},
+		{0, 255, 255},
+		{255, 255, 0},
+		{255, 255, 255},
+	};
+	Glasses::circle(color[n]);
+	n = (n + 1) % 8;
 }
 
 int read(int pin)

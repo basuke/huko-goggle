@@ -10,18 +10,21 @@ static void appendToPool(TimerEntry *entry);
 static TimerEntry *findFreeEntry(TimerCallback f, long d, int count);
 
 
+static unsigned long _now = 0L;
+
+
 void Timer::run() {
     // get current time
-    unsigned long current = millis();
+    _now = millis();
 
-    while (active && active->fireTime <= current) {
+    while (active && active->fireTime <= _now) {
         TimerEntry *entry = active;
         active = entry->next;
 
         if (entry->count == 0) {
             appendToPool(entry);
         } else {
-            appendToActive(entry, current);
+            appendToActive(entry, _now);
         }
 
         if (entry->hasRefcon)
@@ -32,10 +35,16 @@ void Timer::run() {
 }
 
 
+unsigned long Timer::now()
+{
+    return _now;
+}
+
+
 long Timer::repeat(long d, TimerCallback f, int count)
 {
     TimerEntry *entry = findFreeEntry(f, d, count);
-    appendToActive(entry, millis());
+    appendToActive(entry, now());
     return (long) entry;
 }
 
@@ -65,13 +74,10 @@ void Timer::clear(long timer)
 {
     TimerEntry *target = (TimerEntry *) timer;
 
-    DEBUG("try to clear");
     if (target) {
-        DEBUG(timer);
 
         if (active == target) {
             active = target->next;
-            DEBUG("  Cleared");
             appendToPool(target);
         } else {
             TimerEntry *entry = active;
@@ -79,14 +85,12 @@ void Timer::clear(long timer)
             while (entry) {
                 if (entry->next == target) {
                     entry->next = target->next;
-                    DEBUG("  Cleared");
                     appendToPool(target);
                     break;
                 }
                 entry = entry->next;
             }
             if (entry == NULL) {
-                DEBUG("  Cannot find target");
             }
         }
     }

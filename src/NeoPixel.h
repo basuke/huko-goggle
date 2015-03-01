@@ -16,10 +16,10 @@ public:
 	NeoPixelCollection(int start, int size);
 
 	void getColor(int index, byte color[3]);
-	void setColor(int index, byte color[3]);
+	virtual void setColor(int index, byte color[3]);
 
 	// set all pixels to that color
-	void setColor(byte color[3]);
+	virtual void setColor(byte color[3]);
 
 	void setCordinator(NeoPixelCoordinator *coordinator);
 
@@ -31,8 +31,8 @@ public:
 	void attach(NeoPixelAddon *addon);
 	void detach(NeoPixelAddon *addon);
 
-	void beforeTick(unsigned int tick);
-	void afterTick(unsigned int tick);
+	virtual void beforeTick();
+	virtual void afterTick();
 
 protected:
 	NeoPixelCollection *_next;
@@ -51,12 +51,12 @@ class NeoPixelRing : public NeoPixelCollection {
 public:
 	NeoPixelRing(int start, int size);
 
-	virtual int indexToPosition(int index);
-
 	void setClockwise(bool flag) { _clockwise = flag; }
 
 private:
 	bool _clockwise;
+
+	virtual int indexToPosition(int index);
 };
 
 // =====================
@@ -69,7 +69,7 @@ public:
 	void begin(NeoPixelCollection *collections[], int count);
 	inline bool hasBegan() const { return (_neoPixel != NULL); }
 
-	void tick(unsigned int tick);
+	void tick();
 	void getPixel(int index, byte color[3]);
 	void setPixel(int index, byte color[3]);
 
@@ -91,8 +91,8 @@ public:
 
 	virtual bool didAttach();
 	virtual void didDetach();
-	virtual void beforeTick(unsigned int tick);
-	virtual void afterTick(unsigned int tick);
+	virtual void beforeTick();
+	virtual void afterTick();
 	virtual bool beforeSetPixel(int index, byte color[3]);
 	virtual void afterSetPixel(int index, byte color[3]);
 
@@ -114,7 +114,7 @@ public:
 
 	virtual bool didAttach();
 	virtual void didDetach();
-	virtual void afterTick(unsigned int tick);
+	virtual void afterTick();
 
 protected:
 	byte *_buffer;

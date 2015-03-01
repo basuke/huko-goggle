@@ -16,12 +16,14 @@ typedef struct TimerEntry TimerEntry;
 
 #define Hz(x) (1000 / (x))
 
-// #define DEBUG(xxx) Serial.println(xxx)
-#define DEBUG(xxx)
+#define DEBUG(xxx) Serial.println(xxx)
+// #define DEBUG(xxx)
 
 class Timer {
 public:
     static void run();
+
+    static unsigned long now();
 
     static long repeat(long d, TimerCallback f, int count=-1);
     static long repeat(long d, TimerCallbackWithRefcon f, void *refcon, int count=-1);

@@ -7,7 +7,7 @@ class Glasses {
 public:
 	static void begin();
 	static void flash(byte color[3]);
-	static void circle(byte color[3], int duration = 400);
+	static void circle(byte color[3], int duration = 1000);
 };
 
 #endif
