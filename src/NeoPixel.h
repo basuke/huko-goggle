@@ -15,6 +15,8 @@ public:
 	Color(byte red, byte green, byte blue);
 	Color(const Color &other);
 
+	static Color random();
+
 	bool isBlack() const;
 
 	void merge(Color other, double ratio=0.5);

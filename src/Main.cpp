@@ -19,7 +19,7 @@ void Main::setup()
 	pinMode(A2, INPUT);
 	pinMode(A6, INPUT);
 
-	Timer::repeat(2000, ping);
+	Timer::repeat(5000, ping);
 	Timer::repeat(Hz(15), readCommand);
 
 	// Wire.begin();
@@ -53,19 +53,7 @@ void readCommand()
 
 void ping()
 {
-	static int n = 1;
-	Color color[8] = {
-		Color(0, 0, 0),
-		Color(0, 0, 255),
-		Color(255, 0, 0),
-		Color(255, 0, 255),
-		Color(0, 255, 0),
-		Color(0, 255, 255),
-		Color(255, 255, 0),
-		Color(255, 255, 255),
-	};
-	Glasses::circle(color[n]);
-	n = (n + 1) % 8;
+	Glasses::circle(Color::random(), 1000);
 }
 
 int read(int pin)

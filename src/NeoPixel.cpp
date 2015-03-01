@@ -24,6 +24,14 @@ Color::Color(const Color &other)
 {
 }
 
+Color Color::random()
+{
+	int red = ::random(255);
+	int green = ::random(255);
+	int blue = ::random(255);
+	return Color(red, green , blue);
+}
+
 bool Color::isBlack() const
 {
 	return red == 0 && green == 0 && blue == 0;

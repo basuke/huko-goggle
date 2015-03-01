@@ -13,30 +13,34 @@ typedef enum {
 class Ring16 : public NeoPixelRing {
 public:
 	Ring16(int offset);
-	void off(Fade fade = EaseIn, int duration = 500);
+	void off(Fade fade = EaseOut, int duration = 100);
 
-	void setColor(int index, Color color, Fade fade = EaseIn, int duration = 500, Fade offFade = NoFade, double peakFraction = 0.5);
-	void setColor(Color color, Fade fade = EaseIn, int duration = 500, Fade offFade = NoFade, double peakFraction = 0.5);
+	void setColor(int index, Color color, Fade fade = EaseOut, int duration = 100);
+	void setColor(Color color, Fade fade = EaseOut, int duration = 100);
+
+	void flash(int index, Color color, Fade fade = EaseOut, int duration = 100, Fade offFade = EaseIn, int offDuration = 600);
+	void flash(Color color, Fade fade = EaseOut, int duration = 100, Fade offFade = EaseIn, int offDuration = 600);
 
 	virtual void beforeTick();
 
 private:
-	byte fades[16];
+	Fade fades[16];
+	unsigned long startTimes[16];
 	Color startColors[16];
 	Color endColors[16];
-	unsigned long startTimes[16];
 	int durations[16];
-	byte nextFades[16];
+	bool hasNext[16];
+	Fade nextFades[16];
+	Color nextColors[16];
 	int nextDurations[16];
-
-	bool fading;
-
-	void updateFadingState();
 };
 
 Ring16::Ring16(int offset)
-	: NeoPixelRing(offset, 16), fading(false)
+	: NeoPixelRing(offset, 16)
 {
+	for (int i = 0; i < 16; i++) {
+		startTimes[i] = 0L;
+	}
 }
 
 void Ring16::off(Fade fade, int duration)
@@ -45,47 +49,51 @@ void Ring16::off(Fade fade, int duration)
 	setColor(off, fade, duration);
 }
 
-void Ring16::updateFadingState()
-{
-	fading = false;
-	for (int i = 0; i < 16; i++) {
-		if (fades[i] != NoFade) {
-			fading = true;
-			break;
-		}
-	}
-}
-
-void Ring16::setColor(int index, Color color, Fade fade, int duration, Fade offFade, double peakFraction)
+void Ring16::setColor(
+	int index,
+	Color color, Fade fade, int duration)
 {
 	index = index % 16;
 	if (duration <= 0) fade = NoFade;
 
 	fades[index] = fade;
-
-	if (fade || offFade) {
-		unsigned long now = Timer::now();
-
-		startTimes[index] = now;
-		durations[index] = duration * peakFraction;;
-
-		getColor(index, startColors[index]);
-		endColors[index] = color;
-
-		startTimes[index] = now;
-		durations[index] = duration * peakFraction;;
-
-		fading = true;
-	} else {
-		NeoPixelCollection::setColor(index, color);
-		updateFadingState();
-	}
+	startTimes[index] = Timer::now();
+	durations[index] = duration;
+	getColor(index, startColors[index]);
+	endColors[index] = color;
+	hasNext[index] = false;
 }
 
-void Ring16::setColor(Color color, Fade fade, int duration, Fade offFade, double peakFraction)
+void Ring16::setColor(
+	Color color, Fade fade, int duration)
 {
 	for (int i = 0; i < 16; i++) {
 		setColor(i, color, fade, duration);
+	}
+}
+
+void Ring16::flash(
+	int index,
+	Color color, Fade fade, int duration,
+	Fade offFade, int offDuration)
+{
+	setColor(index, color, fade, duration);
+
+	index = index % 16;
+	if (offDuration <= 0) offFade = NoFade;
+
+	hasNext[index] = true;
+	nextFades[index] = offFade;
+	nextDurations[index] = offDuration;
+	nextColors[index] = Color();
+}
+
+void Ring16::flash(
+	Color color, Fade fade, int duration,
+	Fade offFade, int offDuration)
+{
+	for (int i = 0; i < 16; i++) {
+		flash(i, color, fade, duration, offFade, offDuration);
 	}
 }
 
@@ -118,51 +126,60 @@ static char buf[100];
 
 void Ring16::beforeTick()
 {
-	if (fading) {
-		// DEBUG("beforeTick");
+	// DEBUG("beforeTick");
 
-		fading = false;
-		unsigned long now = Timer::now();
+	unsigned long now = Timer::now();
 
-		for (int i = 0; i < 16; i++) {
-			if (fades[i]) {
-				unsigned long s = startTimes[i], e = s + durations[i];
+	for (int i = 0; i < 16; i++) {
+		unsigned long s = startTimes[i];
+		bool finished = false;
 
-				if (now > e) now = e;
-				double fraction = ((double) (now - s)) / ((double) (e - s));
-				double scale = fraction;
+		if (!s || s > now) continue;
 
-				// switch (fades[i]) {
-				// 	case EaseIn:
-				// 		scale = easeIn(fraction);
-				// 		break;
+		Fade fade = fades[i];
+		int duration = durations[i];
+		unsigned long e = s + duration;
 
-				// 	case EaseOut:
-				// 		scale = easeOut(fraction);
-				// 		break;
+		if (fade == NoFade) {
+			NeoPixelCollection::setColor(i, endColors[i]);
+			finished = true;
+		} else {
+			double t = now - s;
+			double fraction = t / ((double) duration);
+			if (fraction > 1.0) fraction = 1.0;
 
-				// 	case EaseInOut:
-				// 		scale = easeInOut(fraction);
-				// 		break;
+			switch (fades[i]) {
+				case EaseIn:
+					fraction = easeIn(fraction);
+					break;
 
-				// 	case Liner:
-				// 	default:
-				// 		scale = fraction;
-				// 		break;
-				// }
+				case EaseOut:
+					fraction = easeOut(fraction);
+					break;
 
-				// DEBUG(scale);
+				case EaseInOut:
+					fraction = easeInOut(fraction);
+					break;
+			}
 
-				Color color = startColors[i];
-				color.merge(endColors[i], scale);
+			Color color = startColors[i];
+			color.merge(endColors[i], fraction);
 
-				NeoPixelCollection::setColor(i, color);
+			NeoPixelCollection::setColor(i, color);
 
-				if (now < e) {
-					fading = true;
-				} else {
-					fades[i] = NoFade;
-				}
+			finished = (fraction == 1.0);
+		}
+
+		if (finished) {
+			if (hasNext[i]) {
+				startTimes[i] = e;
+				durations[i] = nextDurations[i];
+				fades[i] = nextFades[i];
+				startColors[i] = endColors[i];
+				endColors[i] = nextColors[i];
+				hasNext[i] = false;
+			} else {
+				startTimes[i] = 0L;
 			}
 		}
 	}
@@ -195,14 +212,22 @@ void Glasses::begin()
 
 void Glasses::flash(Color color)
 {
-	rightRing.setColor(color, Liner);
-	leftRing.setColor(color, Liner);
+	rightRing.flash(color);
+	leftRing.flash(color);
+}
+
+void Glasses::blink(Color color, int duration)
+{
+	duration /= 2;
+
+	rightRing.flash(color, EaseInOut, duration, EaseInOut, duration);
+	leftRing.flash(color, EaseInOut, duration, EaseInOut, duration);
 }
 
 static void circling()
 {
-	rightRing.setColor(circlingStep, circlingColor);
-	leftRing.setColor(circlingStep, circlingColor);
+	rightRing.flash(circlingStep, circlingColor, EaseInOut, 500, EaseInOut, 500);
+	leftRing.flash(circlingStep, circlingColor, EaseInOut, 500, EaseInOut, 500);
 
 	circlingStep += 1;
 }
