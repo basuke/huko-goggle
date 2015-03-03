@@ -5,7 +5,6 @@
 
 class NeoPixelCoordinator;
 class NeoPixelCollection;
-class NeoPixelAddon;
 class Adafruit_NeoPixel;
 
 class Color {
@@ -47,16 +46,11 @@ public:
 	inline NeoPixelCollection* next() const { return _next; }
 	void setNext(NeoPixelCollection* next);
 
-	void attach(NeoPixelAddon *addon);
-	void detach(NeoPixelAddon *addon);
-
 	virtual void beforeTick();
-	virtual void afterTick();
 
 protected:
 	NeoPixelCollection *_next;
 	NeoPixelCoordinator *_coordinator;
-	NeoPixelAddon *_addon;
 	int _start;
 	int _size;
 
@@ -100,43 +94,6 @@ protected:
 	NeoPixelCollection *_first;
 	bool _changed;
 	int _pin;
-};
-
-class NeoPixelAddon {
-public:
-	NeoPixelAddon();
-
-	inline bool hasAttached() const { return (_target != NULL); }
-
-	virtual bool didAttach();
-	virtual void didDetach();
-	virtual void beforeTick();
-	virtual void afterTick();
-	virtual bool beforeSetPixel(int index, Color color);
-	virtual void afterSetPixel(int index, Color color);
-
-	inline NeoPixelAddon* next() const { return _next; }
-	void setNext(NeoPixelAddon *next);
-
-	inline NeoPixelCollection *target() const { return _target; }
-	void setTarget(NeoPixelCollection *collection);
-
-protected:
-	NeoPixelAddon *_next;
-	NeoPixelCollection *_target;
-};
-
-class NeoPixelDimmerAddon : public NeoPixelAddon {
-public:
-	NeoPixelDimmerAddon();
-	virtual ~NeoPixelDimmerAddon();
-
-	virtual bool didAttach();
-	virtual void didDetach();
-	virtual void afterTick();
-
-protected:
-	byte *_buffer;
 };
 
 #endif

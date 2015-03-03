@@ -72,7 +72,7 @@ bool Color::scale(double scale)
 
 NeoPixelCollection::NeoPixelCollection(int start, int size)
 	:_start(start), _size(size),
-	 _next(NULL), _coordinator(NULL), _addon(NULL)
+	 _next(NULL), _coordinator(NULL)
 {
 }
 
@@ -108,62 +108,8 @@ void NeoPixelCollection::setCordinator(NeoPixelCoordinator *coordinator)
 	_coordinator = coordinator;
 }
 
-void NeoPixelCollection::attach(NeoPixelAddon *addon)
-{
-	if (!addon->hasAttached()) {
-		addon->setTarget(this);
-		if (addon->didAttach()) {
-			if (_addon) {
-				NeoPixelAddon *last = _addon;
-
-				while (last->next()) {
-					last = last->next();
-				}
-				last->setNext(addon);
-			} else {
-				_addon = addon;
-			}
-		} else {
-			addon->setTarget(NULL);
-		}
-	}
-}
-
-void NeoPixelCollection::detach(NeoPixelAddon *addon)
-{
-	if (addon->hasAttached()) {
-		addon->setTarget(NULL);
-		addon->didDetach();
-
-		if (_addon != addon) {
-			NeoPixelAddon *last = _addon;
-
-			while (last->next()) {
-				if (last)
-				last = last->next();
-			}
-			last->setNext(addon);
-		} else {
-			_addon = addon->next();
-		}
-	}
-}
-
 void NeoPixelCollection::beforeTick()
 {
-	NeoPixelAddon *addon = _addon;
-	while (addon) {
-		addon->beforeTick();
-		addon = addon->next();
-	}
-}
-void NeoPixelCollection::afterTick()
-{
-	NeoPixelAddon *addon = _addon;
-	while (addon) {
-		addon->afterTick();
-		addon = addon->next();
-	}
 }
 
 // =====================
@@ -238,12 +184,6 @@ void NeoPixelCoordinator::tick()
 	    _neoPixel->show();
 		_changed = false;
 	}
-
-	target = _first;
-	while (target) {
-		target->afterTick();
-		target = target->next();
-	}
 }
 
 void NeoPixelCoordinator::getPixel(int index, Color &color) {
@@ -256,100 +196,5 @@ void NeoPixelCoordinator::getPixel(int index, Color &color) {
 void NeoPixelCoordinator::setPixel(int index, Color color) {
 	_neoPixel->setPixelColor(index, color.red, color.green, color.blue);
 	_changed = true;
-}
-
-// =====================
-// Addon
-
-NeoPixelAddon::NeoPixelAddon()
-	: _next(NULL), _target(NULL)
-{
-}
-
-bool NeoPixelAddon::didAttach()
-{
-	return true;
-}
-
-void NeoPixelAddon::didDetach()
-{
-
-}
-
-void NeoPixelAddon::beforeTick()
-{
-}
-
-void NeoPixelAddon::afterTick()
-{
-}
-
-bool NeoPixelAddon::beforeSetPixel(int index, Color color)
-{
-
-}
-
-void NeoPixelAddon::afterSetPixel(int index, Color color)
-{
-
-}
-
-void NeoPixelAddon::setNext(NeoPixelAddon *next)
-{
-	_next = next;
-}
-
-void NeoPixelAddon::setTarget(NeoPixelCollection *collection)
-{
-	_target = collection;
-}
-
-// =====================
-// Dimmer addon
-
-typedef struct NeoPixelDimmerRecord {
-	byte phase;
-	Color target;
-} NeoPixelDimmerRecord;
-
-NeoPixelDimmerAddon::NeoPixelDimmerAddon()
-	: _buffer(NULL)
-{
-}
-
-NeoPixelDimmerAddon::~NeoPixelDimmerAddon()
-{
-	if (_buffer) free(_buffer);
-}
-
-bool NeoPixelDimmerAddon::didAttach()
-{
-	int size = target()->getSize();
-	_buffer = (byte *) malloc(size * sizeof(NeoPixelDimmerRecord));
-	memset(_buffer, 0, size * sizeof(NeoPixelDimmerRecord));
-	return true;
-}
-
-void NeoPixelDimmerAddon::didDetach()
-{
-	if (_buffer) free(_buffer);
-	_buffer = NULL;
-}
-
-void NeoPixelDimmerAddon::afterTick()
-{
-	NeoPixelCollection *t = target();
-	int size = t->getSize();
-
-	for (int i = 0; i < size; i++) {
-		bool changed = false;
-
-		Color color;
-		t->getColor(i, color);
-		if (!color.isBlack()) {
-			color.scale(0.94);
-			t->setColor(i, color);
-		}
-	}
 }
 

@@ -1,125 +1,116 @@
 #include "Glasses.h"
 #include "Timer.h"
 #include "NeoPixel.h"
+#include "Effect.h"
 
-typedef enum {
-	NoFade = 0,
-	Liner,
-	EaseIn,
-	EaseOut,
-	EaseInOut,
-} Fade;
+
+struct PixelAnimation {
+	unsigned long startTime;
+	Transition transition;
+	Color startColor;
+	Color endColor;
+	int duration;
+	bool hasNext;
+	Transition nextTransition;
+	Color nextColor;
+	int nextDuration;
+};
+
 
 class Ring16 : public NeoPixelRing {
 public:
 	Ring16(int offset);
-	void off(Fade fade = EaseOut, int duration = 100);
 
-	void setColor(int index, Color color, Fade fade = EaseOut, int duration = 100);
-	void setColor(Color color, Fade fade = EaseOut, int duration = 100);
+	void on(int index, Color color, Transition transition = EaseOut, int duration = 100);
+	void on(Color color, Transition transition = EaseOut, int duration = 100);
 
-	void flash(int index, Color color, Fade fade = EaseOut, int duration = 100, Fade offFade = EaseIn, int offDuration = 600);
-	void flash(Color color, Fade fade = EaseOut, int duration = 100, Fade offFade = EaseIn, int offDuration = 600);
+	void off(int index, Transition transition = EaseIn, int duration = 100);
+	void off(Transition transition = EaseIn, int duration = 100);
+
+	void onOff(int index, Color color, Transition transition = EaseOut, int duration = 100, Transition offTransition = EaseIn, int offDuration = 300);
+	void onOff(Color color, Transition transition = EaseOut, int duration = 100, Transition offTransition = EaseIn, int offDuration = 300);
 
 	virtual void beforeTick();
 
 private:
-	Fade fades[16];
-	unsigned long startTimes[16];
-	Color startColors[16];
-	Color endColors[16];
-	int durations[16];
-	bool hasNext[16];
-	Fade nextFades[16];
-	Color nextColors[16];
-	int nextDurations[16];
+	void setColor(int index, Color color, Transition transition = EaseOut, int duration = 100);
+
+	PixelAnimation animations[16];
 };
 
 Ring16::Ring16(int offset)
 	: NeoPixelRing(offset, 16)
 {
 	for (int i = 0; i < 16; i++) {
-		startTimes[i] = 0L;
+		animations[i].startTime = 0L;
 	}
 }
 
-void Ring16::off(Fade fade, int duration)
+void Ring16::on(int index, Color color, Transition transition, int duration)
+{
+	setColor(index, color, transition, duration);
+}
+
+void Ring16::on(Color color, Transition transition, int duration)
+{
+	for (int i = 0; i < 16; i++) {
+		on(i, color, transition, duration);
+	}
+}
+
+void Ring16::off(int index, Transition transition, int duration)
 {
 	Color off = Color(0, 0, 0);
-	setColor(off, fade, duration);
+	setColor(index, off, transition, duration);
+}
+
+void Ring16::off(Transition transition, int duration)
+{
+	for (int i = 0; i < 16; i++) {
+		off(i, transition, duration);
+	}
+}
+
+void Ring16::onOff(
+	int index,
+	Color color, Transition transition, int duration,
+	Transition offTransition, int offDuration)
+{
+	setColor(index, color, transition, duration);
+
+	index = index % 16;
+	if (offDuration <= 0) offTransition = NoTransition;
+
+	PixelAnimation *animation = &animations[index];
+	animation->hasNext = true;
+	animation->nextTransition = offTransition;
+	animation->nextDuration = offDuration;
+	animation->nextColor = Color();
+}
+
+void Ring16::onOff(
+	Color color, Transition transition, int duration,
+	Transition offTransition, int offDuration)
+{
+	for (int i = 0; i < 16; i++) {
+		onOff(i, color, transition, duration, offTransition, offDuration);
+	}
 }
 
 void Ring16::setColor(
 	int index,
-	Color color, Fade fade, int duration)
+	Color color, Transition transition, int duration)
 {
 	index = index % 16;
-	if (duration <= 0) fade = NoFade;
+	if (duration <= 0) transition = NoTransition;
 
-	fades[index] = fade;
-	startTimes[index] = Timer::now();
-	durations[index] = duration;
-	getColor(index, startColors[index]);
-	endColors[index] = color;
-	hasNext[index] = false;
-}
-
-void Ring16::setColor(
-	Color color, Fade fade, int duration)
-{
-	for (int i = 0; i < 16; i++) {
-		setColor(i, color, fade, duration);
-	}
-}
-
-void Ring16::flash(
-	int index,
-	Color color, Fade fade, int duration,
-	Fade offFade, int offDuration)
-{
-	setColor(index, color, fade, duration);
-
-	index = index % 16;
-	if (offDuration <= 0) offFade = NoFade;
-
-	hasNext[index] = true;
-	nextFades[index] = offFade;
-	nextDurations[index] = offDuration;
-	nextColors[index] = Color();
-}
-
-void Ring16::flash(
-	Color color, Fade fade, int duration,
-	Fade offFade, int offDuration)
-{
-	for (int i = 0; i < 16; i++) {
-		flash(i, color, fade, duration, offFade, offDuration);
-	}
-}
-
-static double easeIn(double fraction)
-{
-	return fraction * fraction;
-}
-
-static double easeOut(double fraction)
-{
-	return -1.0 * fraction * (fraction - 2.0);
-}
-
-static double easeInOut(double fraction)
-{
-	fraction *= 2.0;
-	if (fraction < 1.0)
-		return fraction * fraction / 2.0;
-	fraction -= 1.0;
-	return (fraction * (fraction - 2.0) - 1.0) / -2.0;
-}
-
-static void calcColor(Color start, Color end, double fraction, Color color)
-{
-	color = start;
-	color.merge(end, fraction);
+	PixelAnimation *animation = &animations[index];
+	animation->transition = transition;
+	animation->startTime = Timer::now();
+	animation->duration = duration;
+	getColor(index, animation->startColor);
+	animation->endColor = color;
+	animation->hasNext = false;
 }
 
 static char buf[100];
@@ -131,39 +122,27 @@ void Ring16::beforeTick()
 	unsigned long now = Timer::now();
 
 	for (int i = 0; i < 16; i++) {
-		unsigned long s = startTimes[i];
+		PixelAnimation *a = &animations[i];
+		unsigned long s = a->startTime;
 		bool finished = false;
 
 		if (!s || s > now) continue;
 
-		Fade fade = fades[i];
-		int duration = durations[i];
+		Transition transition = a->transition;
+		int duration = a->duration;
 		unsigned long e = s + duration;
 
-		if (fade == NoFade) {
-			NeoPixelCollection::setColor(i, endColors[i]);
+		if (transition == NoTransition) {
+			NeoPixelCollection::setColor(i, a->endColor);
 			finished = true;
 		} else {
 			double t = now - s;
 			double fraction = t / ((double) duration);
 			if (fraction > 1.0) fraction = 1.0;
+			fraction = Effect::transit(a->transition, fraction);
 
-			switch (fades[i]) {
-				case EaseIn:
-					fraction = easeIn(fraction);
-					break;
-
-				case EaseOut:
-					fraction = easeOut(fraction);
-					break;
-
-				case EaseInOut:
-					fraction = easeInOut(fraction);
-					break;
-			}
-
-			Color color = startColors[i];
-			color.merge(endColors[i], fraction);
+			Color color = a->startColor;
+			color.merge(a->endColor, fraction);
 
 			NeoPixelCollection::setColor(i, color);
 
@@ -171,15 +150,15 @@ void Ring16::beforeTick()
 		}
 
 		if (finished) {
-			if (hasNext[i]) {
-				startTimes[i] = e;
-				durations[i] = nextDurations[i];
-				fades[i] = nextFades[i];
-				startColors[i] = endColors[i];
-				endColors[i] = nextColors[i];
-				hasNext[i] = false;
+			if (a->hasNext) {
+				a->startTime = e;
+				a->duration = a->nextDuration;
+				a->transition = a->nextTransition;
+				a->startColor = a->endColor;
+				a->endColor = a->nextColor;
+				a->hasNext = false;
 			} else {
-				startTimes[i] = 0L;
+				a->startTime = 0L;
 			}
 		}
 	}
@@ -190,7 +169,6 @@ void Ring16::beforeTick()
 static NeoPixelCoordinator neoPixel(5);
 static Ring16 rightRing(0);
 static Ring16 leftRing(16);
-static NeoPixelDimmerAddon dimmer;
 
 static int circlingStep;
 static Color circlingColor;
@@ -203,46 +181,50 @@ void Glasses::begin()
 	};
 	neoPixel.begin(collections , 2);
 
-	rightRing.off(NoFade);
+	rightRing.off(NoTransition);
 	rightRing.setClockwise(false);
-	leftRing.off(NoFade);
+	leftRing.off(NoTransition);
 	leftRing.setClockwise(false);
 }
 
 
 void Glasses::flash(Color color)
 {
-	rightRing.flash(color);
-	leftRing.flash(color);
+	rightRing.onOff(color);
+	leftRing.onOff(color);
 }
 
 void Glasses::blink(Color color, int duration)
 {
 	duration /= 2;
 
-	rightRing.flash(color, EaseInOut, duration, EaseInOut, duration);
-	leftRing.flash(color, EaseInOut, duration, EaseInOut, duration);
+	rightRing.onOff(color, EaseInOut, duration, EaseInOut, duration);
+	leftRing.onOff(color, EaseInOut, duration, EaseInOut, duration);
 }
 
 static void circling()
 {
-	rightRing.flash(circlingStep, circlingColor, EaseInOut, 500, EaseInOut, 500);
-	leftRing.flash(circlingStep, circlingColor, EaseInOut, 500, EaseInOut, 500);
+	rightRing.onOff(circlingStep, circlingColor, EaseInOut, 250, EaseInOut, 400);
+	leftRing.onOff(circlingStep, circlingColor, EaseInOut, 250, EaseInOut, 400);
 
 	circlingStep += 1;
 }
 
-void Glasses::circle(Color color, int duration)
+void Glasses::circle(Color color, int duration, int count)
 {
 	circlingStep = 0;
 	circlingColor = color;
+
+	duration *= count;
+	count = count * 16 - 1;
 
 	sprintf(buf, "[%08lx]: color: %3d %3d %3d", Timer::now(), color.red, color.green, color.blue);
 	DEBUG(buf);
 	Serial.flush();
 
-	Timer::repeat(duration / 15, circling, 15);
-
-	circling();
+	if (count > 0) {
+		Timer::repeat(duration / count, circling, count);
+		circling();
+	}
 }
 
