@@ -193,12 +193,12 @@ void NeoPixelCoordinator::setPixel(int index, Color color) {
 // ====================================
 
 NeoPixelAnimator::NeoPixelAnimator(NeoPixel &pixel)
-	: _pixel(&pixel), _next(NULL)
+	: _pixel(&pixel), _size(pixel.getSize()), _next(NULL)
 {
 	_pixel->coordinator()->addAnimator(this);
 
-	_animations = reinterpret_cast<PixelAnimation*>(::malloc(sizeof(PixelAnimation) * pixel.getSize()));
-	for (int i = 0; i < 16; i++) {
+	_animations = reinterpret_cast<PixelAnimation*>(::malloc(sizeof(PixelAnimation) * _size));
+	for (int i = 0; i < _size; i++) {
 		_animations[i].startTime = 0L;
 	}
 }
@@ -210,7 +210,7 @@ void NeoPixelAnimator::on(int index, Color color, Transition transition, int dur
 
 void NeoPixelAnimator::on(Color color, Transition transition, int duration)
 {
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < _size; i++) {
 		on(i, color, transition, duration);
 	}
 }
@@ -223,7 +223,7 @@ void NeoPixelAnimator::off(int index, Transition transition, int duration)
 
 void NeoPixelAnimator::off(Transition transition, int duration)
 {
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < _size; i++) {
 		off(i, transition, duration);
 	}
 }
@@ -235,7 +235,7 @@ void NeoPixelAnimator::onOff(
 {
 	animate(index, color, transition, duration);
 
-	index = index % 16;
+	index = index % _size;
 	if (offDuration <= 0) offTransition = NoTransition;
 
 	PixelAnimation *animation = &_animations[index];
@@ -249,7 +249,7 @@ void NeoPixelAnimator::onOff(
 	Color color, Transition transition, int duration,
 	Transition offTransition, int offDuration)
 {
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < _size; i++) {
 		onOff(i, color, transition, duration, offTransition, offDuration);
 	}
 }
@@ -258,7 +258,7 @@ void NeoPixelAnimator::animate(
 	int index,
 	Color color, Transition transition, int duration)
 {
-	index = index % 16;
+	index = index % _size;
 	if (duration <= 0) transition = NoTransition;
 
 	PixelAnimation *animation = &_animations[index];
@@ -274,7 +274,7 @@ void NeoPixelAnimator::tick()
 {
 	unsigned long now = Timer::now();
 
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < _size; i++) {
 		PixelAnimation *a = &_animations[i];
 		unsigned long s = a->startTime;
 		bool finished = false;

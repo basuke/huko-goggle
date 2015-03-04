@@ -138,6 +138,7 @@ public:
 private:
 	void animate(int index, Color color, Transition transition = EaseOut, int duration = 100);
 
+	int _size;
 	NeoPixel *_pixel;
 	PixelAnimation *_animations;
 	NeoPixelAnimator *_next;
