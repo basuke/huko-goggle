@@ -2,6 +2,7 @@
 #include "Timer.h"
 #include "Glasses.h"
 
+
 void readCommand();
 void readAccelerometer();
 void sensor();

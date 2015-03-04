@@ -45,3 +45,5 @@ double Effect::easeInOut(double fraction)
 	return (fraction * (fraction - 2.0) - 1.0) / -2.0;
 }
 
+// =======================
+

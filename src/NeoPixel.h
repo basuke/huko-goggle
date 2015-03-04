@@ -2,9 +2,12 @@
 #define _NEOPIXEL_H_
 
 #include <Arduino.h>
+#include "Effect.h"
+
 
 class NeoPixelCoordinator;
-class NeoPixelCollection;
+class NeoPixel;
+class NeoPixelAnimator;
 class Adafruit_NeoPixel;
 
 class Color {
@@ -27,11 +30,11 @@ public:
 };
 
 // =====================
-// abstract collection
+// abstract NeoPixel Collections
 
-class NeoPixelCollection {
+class NeoPixel {
 public:
-	NeoPixelCollection(int start, int size);
+	NeoPixel(NeoPixelCoordinator &coordinator, int start, int size);
 
 	void getColor(int index, Color &color);
 	virtual void setColor(int index, Color color);
@@ -39,17 +42,16 @@ public:
 	// set all pixels to that color
 	virtual void setColor(Color color);
 
-	void setCordinator(NeoPixelCoordinator *coordinator);
+	int getSize() const { return _size; }
+	int getStart() const { return _start; }
 
-	inline int getSize() const { return _size; }
-	inline int getStart() const { return _start; }
-	inline NeoPixelCollection* next() const { return _next; }
-	void setNext(NeoPixelCollection* next);
+	NeoPixel* next() { return _next; }
+	void setNext(NeoPixel* next) { _next = next; }
 
-	virtual void beforeTick();
+	NeoPixelCoordinator* coordinator() { return _coordinator; }
 
 protected:
-	NeoPixelCollection *_next;
+	NeoPixel *_next;
 	NeoPixelCoordinator *_coordinator;
 	int _start;
 	int _size;
@@ -60,9 +62,9 @@ protected:
 // =====================
 // NeoPixel Ring
 
-class NeoPixelRing : public NeoPixelCollection {
+class NeoPixelRing : public NeoPixel {
 public:
-	NeoPixelRing(int start, int size);
+	NeoPixelRing(NeoPixelCoordinator &coordinator, int start, int size);
 
 	void setClockwise(bool flag) { _clockwise = flag; }
 
@@ -79,8 +81,8 @@ class NeoPixelCoordinator {
 public:
 	NeoPixelCoordinator(int pin);
 
-	void begin(NeoPixelCollection *collections[], int count);
-	inline bool hasBegan() const { return (_neoPixel != NULL); }
+	void begin();
+	bool hasBegan() const { return (_neoPixel != NULL); }
 
 	void tick();
 	void getPixel(int index, Color &color);
@@ -89,11 +91,56 @@ public:
 	byte *pixels() const;
 	int numberOfPixels() const;
 
+	void addNeoPixel(NeoPixel *pixel);
+	void addAnimator(NeoPixelAnimator *animator);
+
 protected:
 	Adafruit_NeoPixel *_neoPixel;
-	NeoPixelCollection *_first;
+	NeoPixel *_pixels;
+	NeoPixelAnimator *_animators;
 	bool _changed;
 	int _pin;
+};
+
+// =====================
+// NeoPixel Animator
+
+struct PixelAnimation {
+	unsigned long startTime;
+	Transition transition;
+	Color startColor;
+	Color endColor;
+	int duration;
+	bool hasNext;
+	Transition nextTransition;
+	Color nextColor;
+	int nextDuration;
+};
+
+class NeoPixelAnimator {
+public:
+	NeoPixelAnimator(NeoPixel &pixel);
+
+	void on(int index, Color color, Transition transition = EaseOut, int duration = 100);
+	void on(Color color, Transition transition = EaseOut, int duration = 100);
+
+	void off(int index, Transition transition = EaseIn, int duration = 100);
+	void off(Transition transition = EaseIn, int duration = 100);
+
+	void onOff(int index, Color color, Transition transition = EaseOut, int duration = 100, Transition offTransition = EaseIn, int offDuration = 300);
+	void onOff(Color color, Transition transition = EaseOut, int duration = 100, Transition offTransition = EaseIn, int offDuration = 300);
+
+	void tick();
+
+	NeoPixelAnimator* next() { return _next; }
+	void setNext(NeoPixelAnimator* next) { _next = next; }
+
+private:
+	void animate(int index, Color color, Transition transition = EaseOut, int duration = 100);
+
+	NeoPixel *_pixel;
+	PixelAnimation *_animations;
+	NeoPixelAnimator *_next;
 };
 
 #endif

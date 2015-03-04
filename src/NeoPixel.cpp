@@ -1,5 +1,7 @@
 #include "NeoPixel.h"
 #include "Timer.h"
+#include "Effect.h"
+
 #include <Adafruit_NeoPixel.h>
 
 // ====================================
@@ -68,57 +70,43 @@ bool Color::scale(double scale)
 }
 
 // =====================
-// abstract collection
+// abstract NeoPixel collection
 
-NeoPixelCollection::NeoPixelCollection(int start, int size)
+NeoPixel::NeoPixel(NeoPixelCoordinator &coordinator, int start, int size)
 	:_start(start), _size(size),
-	 _next(NULL), _coordinator(NULL)
+	 _next(NULL), _coordinator(&coordinator)
 {
+	coordinator.addNeoPixel(this);
 }
 
-int NeoPixelCollection::indexToPosition(int index)
+int NeoPixel::indexToPosition(int index)
 {
 	return _start + index;
 }
 
-void NeoPixelCollection::getColor(int index, Color &color)
+void NeoPixel::getColor(int index, Color &color)
 {
 	_coordinator->getPixel(indexToPosition(index), color);
 }
 
-void NeoPixelCollection::setColor(int index, Color color)
+void NeoPixel::setColor(int index, Color color)
 {
 	_coordinator->setPixel(indexToPosition(index), color);
 }
 
-void NeoPixelCollection::setColor(Color color)
+void NeoPixel::setColor(Color color)
 {
 	for (int i = 0; i < _size; i++) {
 		_coordinator->setPixel(indexToPosition(i), color);
 	}
 }
 
-void NeoPixelCollection::setNext(NeoPixelCollection *collection)
-{
-	_next = collection;
-}
-
-void NeoPixelCollection::setCordinator(NeoPixelCoordinator *coordinator)
-{
-	_coordinator = coordinator;
-}
-
-void NeoPixelCollection::beforeTick()
-{
-}
-
 // =====================
 // NeoPixel Ring
 
-NeoPixelRing::NeoPixelRing(int start, int size)
-	: NeoPixelCollection(start, size), _clockwise(true)
+NeoPixelRing::NeoPixelRing(NeoPixelCoordinator &coordinator, int start, int size)
+	: NeoPixel(coordinator, start, size), _clockwise(true)
 {
-
 }
 
 
@@ -127,7 +115,7 @@ int NeoPixelRing::indexToPosition(int index)
 	int size = getSize();
 	if (index < 0 || index >= size) index = index % size;
 	if (index != 0 && _clockwise) index = size - index;
-	return NeoPixelCollection::indexToPosition(index);
+	return NeoPixel::indexToPosition(index);
 
 }
 
@@ -137,24 +125,30 @@ int NeoPixelRing::indexToPosition(int index)
 static void callTick(void *refcon);
 
 NeoPixelCoordinator::NeoPixelCoordinator(int pin)
-	: _pin(pin), _changed(false), _first(NULL), _neoPixel(NULL)
+	: _pin(pin), _changed(false), _pixels(NULL), _animators(NULL), _neoPixel(NULL)
 {
 }
 
-void NeoPixelCoordinator::begin(NeoPixelCollection *collections[], int count)
+void NeoPixelCoordinator::addNeoPixel(NeoPixel *pixel)
 {
-	_first = count > 0 ? collections[0] : NULL;
+	pixel->setNext(_pixels);
+	_pixels = pixel;
+}
+
+void NeoPixelCoordinator::addAnimator(NeoPixelAnimator *animator)
+{
+	animator->setNext(_animators);
+	_animators = animator;
+}
+
+void NeoPixelCoordinator::begin()
+{
 	int size = 0;
 
-	NeoPixelCollection *prev = NULL;
-	for (int i = 0; i < count; i++) {
-		NeoPixelCollection *collection = collections[i];
-		if (prev) prev->setNext(collection);
-
-		collection->setCordinator(this);
-		size += collection->getSize();
-
-		prev = collection;
+	NeoPixel *pixel = _pixels;
+	while (pixel) {
+		size += pixel->getSize();
+		pixel = pixel->next();
 	}
 
 	_neoPixel = new Adafruit_NeoPixel(size, _pin, NEO_GRB + NEO_KHZ800);
@@ -165,19 +159,17 @@ void NeoPixelCoordinator::begin(NeoPixelCollection *collections[], int count)
 
 static void callTick(void *refcon)
 {
-	NeoPixelCoordinator *pixel = (NeoPixelCoordinator *)refcon;
+	NeoPixelCoordinator *coordinator = (NeoPixelCoordinator *)refcon;
 
-	pixel->tick();
+	coordinator->tick();
 }
 
 void NeoPixelCoordinator::tick()
 {
-	NeoPixelCollection *target;
-
-	target = _first;
-	while (target) {
-		target->beforeTick();
-		target = target->next();
+	NeoPixelAnimator *animator = _animators;
+	while (animator) {
+		animator->tick();
+		animator = animator->next();
 	}
 
 	if (_changed) {
@@ -196,5 +188,132 @@ void NeoPixelCoordinator::getPixel(int index, Color &color) {
 void NeoPixelCoordinator::setPixel(int index, Color color) {
 	_neoPixel->setPixelColor(index, color.red, color.green, color.blue);
 	_changed = true;
+}
+
+// ====================================
+
+NeoPixelAnimator::NeoPixelAnimator(NeoPixel &pixel)
+	: _pixel(&pixel), _next(NULL)
+{
+	_pixel->coordinator()->addAnimator(this);
+
+	_animations = reinterpret_cast<PixelAnimation*>(::malloc(sizeof(PixelAnimation) * pixel.getSize()));
+	for (int i = 0; i < 16; i++) {
+		_animations[i].startTime = 0L;
+	}
+}
+
+void NeoPixelAnimator::on(int index, Color color, Transition transition, int duration)
+{
+	animate(index, color, transition, duration);
+}
+
+void NeoPixelAnimator::on(Color color, Transition transition, int duration)
+{
+	for (int i = 0; i < 16; i++) {
+		on(i, color, transition, duration);
+	}
+}
+
+void NeoPixelAnimator::off(int index, Transition transition, int duration)
+{
+	Color off = Color(0, 0, 0);
+	animate(index, off, transition, duration);
+}
+
+void NeoPixelAnimator::off(Transition transition, int duration)
+{
+	for (int i = 0; i < 16; i++) {
+		off(i, transition, duration);
+	}
+}
+
+void NeoPixelAnimator::onOff(
+	int index,
+	Color color, Transition transition, int duration,
+	Transition offTransition, int offDuration)
+{
+	animate(index, color, transition, duration);
+
+	index = index % 16;
+	if (offDuration <= 0) offTransition = NoTransition;
+
+	PixelAnimation *animation = &_animations[index];
+	animation->hasNext = true;
+	animation->nextTransition = offTransition;
+	animation->nextDuration = offDuration;
+	animation->nextColor = Color();
+}
+
+void NeoPixelAnimator::onOff(
+	Color color, Transition transition, int duration,
+	Transition offTransition, int offDuration)
+{
+	for (int i = 0; i < 16; i++) {
+		onOff(i, color, transition, duration, offTransition, offDuration);
+	}
+}
+
+void NeoPixelAnimator::animate(
+	int index,
+	Color color, Transition transition, int duration)
+{
+	index = index % 16;
+	if (duration <= 0) transition = NoTransition;
+
+	PixelAnimation *animation = &_animations[index];
+	animation->transition = transition;
+	animation->startTime = Timer::now();
+	animation->duration = duration;
+	_pixel->getColor(index, animation->startColor);
+	animation->endColor = color;
+	animation->hasNext = false;
+}
+
+void NeoPixelAnimator::tick()
+{
+	unsigned long now = Timer::now();
+
+	for (int i = 0; i < 16; i++) {
+		PixelAnimation *a = &_animations[i];
+		unsigned long s = a->startTime;
+		bool finished = false;
+
+		if (!s || s > now) continue;
+
+		Transition transition = a->transition;
+		int duration = a->duration;
+		unsigned long e = s + duration;
+
+		if (transition == NoTransition) {
+			_pixel->setColor(i, a->endColor);
+			finished = true;
+		} else {
+			double t = now - s;
+			double fraction = t / ((double) duration);
+			if (fraction > 1.0) fraction = 1.0;
+			fraction = Effect::transit(a->transition, fraction);
+
+			Color color = a->startColor;
+			color.merge(a->endColor, fraction);
+
+			_pixel->setColor(i, color);
+
+			finished = (fraction == 1.0);
+		}
+
+		if (finished) {
+			if (a->hasNext) {
+				a->startTime = e;
+				a->duration = a->nextDuration;
+				a->transition = a->nextTransition;
+				a->startColor = a->endColor;
+				a->endColor = a->nextColor;
+				a->hasNext = false;
+			} else {
+				a->startTime = 0L;
+			}
+		}
+	}
 }
 
