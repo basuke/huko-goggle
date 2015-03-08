@@ -16,13 +16,58 @@ void Glasses::begin()
 {
 	coordinator.begin();
 
-	rightRingPixel.setClockwise(false);
-	leftRingPixel.setClockwise(false);
+	rightRingPixel.setClockwise(true);
+	leftRingPixel.setClockwise(true);
 
 	rightRing.off(NoTransition);
 	leftRing.off(NoTransition);
 }
 
+static double convert(double fraction)
+{
+	const double threshold = 0.7;
+	const double value = 0.5;
+
+	if (fraction > threshold) {
+		return value + (1.0 - value) * (fraction - threshold) / (1.0 - threshold);
+	} else {
+		return value * fraction / threshold;
+	}
+}
+
+static void demoOn();
+static void demoOff();
+
+static void demoOn()
+{
+	Color base = Color::random();
+
+	for (int i = 0; i < 16; i++) {
+		Color color = base, color2 = base;
+
+		double fraction = (double) i / 15.0;
+		color.scale(convert(fraction));
+		color2.scale(fraction);
+
+		leftRing.on(i, color, EaseInOut, 1000);
+		rightRing.on(i, color2, EaseInOut, 1000);
+	}
+
+	Timer::once(3000, demoOff);
+}
+
+static void demoOff()
+{
+	leftRing.off(EaseInOut, 1000);
+	rightRing.off(EaseInOut, 1000);
+
+	Timer::once(3000, demoOn);
+}
+
+void Glasses::demo()
+{
+	demoOn();
+}
 
 void Glasses::flash(Color color)
 {

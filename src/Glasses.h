@@ -6,6 +6,7 @@
 class Glasses {
 public:
 	static void begin();
+	static void demo();
 	static void flash(Color color);
 	static void blink(Color color, int duration = 1000);
 	static void circle(Color color, int duration = 500, int count = 2);

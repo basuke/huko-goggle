@@ -20,7 +20,9 @@ void Main::setup()
 	pinMode(A2, INPUT);
 	pinMode(A6, INPUT);
 
-	Timer::repeat(5000, ping);
+	Glasses::demo();
+
+	// Timer::repeat(5000, ping);
 	Timer::repeat(Hz(15), readCommand);
 
 	// Wire.begin();
